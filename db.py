@@ -1,4 +1,4 @@
-from sqlmodel import Session,engine,SQLModel
+from sqlmodel import Session,engine,SQLModel,create_engine
 
 db_url = "sqlite:///kitaab.db"
 
