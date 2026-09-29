@@ -1,27 +1,26 @@
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
-import models.user as user_model
+from typing import TYPE_CHECKING, Optional
+
+from sqlmodel import Field, Relationship, SQLModel
+
+if TYPE_CHECKING:
+    from models.user import User
+
 
 class Book(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    title: str = Field(index=True)
-    owner: "user_model.User" = Relationship(back_populates="books")
-    author: str = Field(index=True)
-    price: float
+    title: str = Field(index=True, min_length=1, max_length=200)
+    author: str = Field(index=True, min_length=1, max_length=100)
+    price: float = Field(gt=0)
     is_sold: bool = Field(default=False)
-
-    #Foreign key to the User model
-    user_id: int = Field(default=None, foreign_key="user.id")
-
-
+    user_id: int = Field(foreign_key="user.id", index=True)
+    owner: Optional["User"] = Relationship(back_populates="books")
 
 
 class BookCreate(SQLModel):
-    title: str
-    author: str
-    price: float
+    title: str = Field(min_length=1, max_length=200)
+    author: str = Field(min_length=1, max_length=100)
+    price: float = Field(gt=0)
     user_id: int
-
 
 
 class BookRead(SQLModel):
@@ -31,6 +30,3 @@ class BookRead(SQLModel):
     price: float
     is_sold: bool
     user_id: int
-
-
-Book.model_rebuild()

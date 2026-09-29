@@ -1,4 +1,7 @@
-fastapi
-sqlmodel
-uvicorn[standard]
-sqlalchemy
+fastapi==0.141.1
+pydantic==2.13.5
+sqlmodel==0.0.47
+SQLAlchemy==2.0.54
+uvicorn[standard]==0.54.0
+python-dotenv==1.2.3
+email-validator==2.3.0

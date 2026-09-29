@@ -1,62 +1,124 @@
-# Header-Based Authentication API
+# Kitaab API
 
-A secure REST API built with **FastAPI** that uses custom header-based authentication.
+A small REST API for tracking users and the books they own, built with **FastAPI**,
+**SQLModel**, and header-based authentication.
 
 ## Features
-* Fast and lightweight asynchronous performance with FastAPI.
-* Custom HTTP header validation for secure endpoint access.
-* Automatic interactive documentation via Swagger UI.
+
+* FastAPI with automatic OpenAPI docs at `/docs` and `/redoc`.
+* Custom `x-api-key` header authentication, applied to every endpoint via a dependency.
+* SQLModel/SQLAlchemy models with typed request and response schemas.
+* Pagination on list endpoints.
+* Test suite covering auth, validation, and persistence.
 
 ## Requirements
-* Python 3.8+
-* FastAPI
-* Uvicorn
 
-## Installation
+* Python 3.10+
+* The packages in `requirements.txt`
 
-1. Clone the repository:
+## Setup
+
+1. Create and activate a virtual environment:
+
    ```bash
-   git clone <repository-url>
-   cd <repository-folder>
+   python -m venv .venv
+   .venv\Scripts\activate      # Windows
+   source .venv/bin/activate   # macOS / Linux
    ```
 
-2. Create and activate a virtual environment:
+2. Install dependencies:
+
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows use: venv\Scripts\activate
+   pip install -r requirements.txt
    ```
 
-3. Install the dependencies:
+3. Create your `.env` and set an API key:
+
    ```bash
-   pip install fastapi uvicorn
+   cp .env.example .env
+   python -c "import secrets; print(secrets.token_urlsafe(32))"
    ```
 
-## Running the Application
+   Paste the output in as `X_API_KEY`. The app refuses to start without it, so a
+   missing key fails loudly at boot instead of silently rejecting every request.
 
-Start the development server using Uvicorn:
+## Running
+
 ```bash
 uvicorn main:app --reload
 ```
 
-The API will be available at `http://127.0.0.1:8000`.
+The API is at `http://127.0.0.1:8000`, with docs at `http://127.0.0.1:8000/docs`.
+
+## Configuration
+
+All settings come from the environment (and `.env` locally).
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `X_API_KEY` | *none* | **Required.** The value clients must send as `x-api-key`. |
+| `DATABASE_URL` | `sqlite:///kitaab.db` | Any SQLAlchemy URL. |
+| `SQL_ECHO` | `false` | Set to `true` to log every SQL statement. |
+| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated. |
 
 ## Authentication
 
-Every protected request must include your secret token in the custom header:
-* **Header Name:** `x-api-key`
-* **Header Value:** `your-secret-token`
+Every endpoint except `/health` requires the key in a header:
 
-## Example Request
-
-You can test the protected endpoint using `curl`:
-```bash
-curl -X 'GET' \
-  'http://127.0.0' \
-  -H 'accept: application/json' \
-  -H 'x-api-key: your-secret-token'
+```
+x-api-key: <your key>
 ```
 
-## API Documentation
-Once the server is running, open your browser and go to:
-* **Swagger UI:** `http://127.0.0`
-* **Redoc:** `http://127.0.0`
+A missing key and a wrong key both return `401`. Comparison is constant-time.
+
+## Endpoints
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/health` | Liveness probe. No auth. |
+| `POST` | `/users/` | Register a user. `400` if the email is taken. |
+| `GET` | `/users/` | List users. |
+| `POST` | `/books/` | Create a book. `404` if `user_id` doesn't exist. |
+| `GET` | `/books/` | List books. |
+
+List endpoints accept `offset` (default `0`) and `limit` (default `20`, max `100`).
+
+Emails are normalised to lowercase, so `Sam@x.com` and `sam@x.com` are the same account.
+
+### Example
+
+```bash
+curl -X POST 'http://127.0.0.1:8000/users/' \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: your-secret-token' \
+  -d '{"name": "Salman", "email": "salman@example.com", "college": "KLS"}'
+```
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+## Project layout
+
+```
+main.py            app instance, lifespan, router wiring
+config.py          environment-backed settings
+db.py              engine, session dependency, table creation
+auth.py            x-api-key dependency
+models/            SQLModel tables and request/response schemas
+routes/            endpoint definitions
+tests/             pytest suite
+```
+
+## Notes for production
+
+* SQLite is the default for convenience. Point `DATABASE_URL` at Postgres for real
+  deployments.
+* Create tables with a migration tool (e.g. Alembic) rather than relying on
+  `create_all()` at startup.
+* Terminate TLS in front of the app, and keep `X_API_KEY` out of client-side code —
+  a static shared key identifies the app, not the user. Add real user auth before
+  this holds anything sensitive.
